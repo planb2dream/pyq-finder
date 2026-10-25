@@ -155,27 +155,20 @@
 
   const dashHTML = () => {
     const done = Object.keys(st.watched).filter((id) => PF.lecById[id]);
-    const doneMin = done.reduce((a, id) => a + PF.lecById[id].m, 0);
+    const doneMin = done.reduce((s, id) => s + PF.lecById[id].m, 0);
     const pct = Math.round((doneMin / PF.totalMin) * 100);
-    const recent = st.recent.map((id) => PF.lecById[id]).filter(Boolean);
-    const top = [...PF.lecs].sort((a, b) => b.pq - a.pq || b.yield - a.yield).slice(0, 12);
-    const rep = [...PF.qs].filter((q) => q.L.length).sort((a, b) => b.n - a.n || b.ymax - a.ymax).slice(0, 8);
     const ex = PF.examDays(); const rs = PF.revStats();
     return `<div class="hero homehero fade" style="display:flex;gap:1rem;align-items:center">
-        <div style="flex:1;position:relative;z-index:1"><div class="k">Final MBBS · Part II</div><h1>Find PYQs & the lectures that cover them</h1>
-        <p>${PF.qs.length.toLocaleString()} questions · ${PF.papers.length} papers · ${PF.lecs.length} lectures</p>${ex > 0 ? `<p style="font-weight:800;margin-top:.5rem">📅 ${ex} day${ex === 1 ? '' : 's'} to exam</p>` : ''}</div>
+        <div style="flex:1;position:relative;z-index:1"><div class="k">Final MBBS · Part II</div><h1>PYQs + the lectures that cover them</h1>
+        <p>${PF.qs.length.toLocaleString()} questions · ${PF.lecs.length} lectures</p>${ex > 0 ? `<p style="font-weight:800;margin-top:.4rem">📅 ${ex} day${ex === 1 ? '' : 's'} to exam</p>` : ''}</div>
         <div class="ring" style="--p:${pct}"><b>${pct}%</b></div></div>
-      <div class="chips" style="margin-top:.8rem">${PF.SUBJ.map((c) => `<button class="chip" ${col(c)} data-go="#/subject/${c}"><i class="d"></i>${esc(SM[c].s)}</button>`).join('')}</div>
-      ${rs.due ? `<div class="card" style="margin-top:.8rem;display:flex;align-items:center;gap:.8rem" data-go="#/quiz?due=1"><div style="font-size:1.6rem">🔔</div><div style="flex:1"><b>${rs.due} PYQ${rs.due > 1 ? 's' : ''} due for revision</b><p class="sub">Spaced review keeps them in memory</p></div><span class="btn" style="padding:.5rem .9rem">Review</span></div>` : ''}
-      ${st.pins.length ? `<h2 class="sec">${ic('bookmark')} Pinned topics</h2><div class="chips">${st.pins.map((r) => `<button class="chip" data-act="chip-search" data-v="${esc(r)}">${esc(r)}</button>`).join('')}</div>` : ''}
-      ${st.recentS.length ? `<h2 class="sec">Recent searches</h2><div class="chips">${st.recentS.map((r) => `<button class="chip x" data-act="chip-search" data-v="${esc(r)}">${ic('clock', 'sm')}${esc(r)}</button>`).join('')}<button class="chip" data-act="clear-recent">Clear</button></div>` : `<h2 class="sec">Try searching</h2><div class="chips">${['cirrhosis', 'DKA', 'breast', 'fracture', 'hypertension', 'PPH', 'cataract', 'tubal patency', '2019'].map((r) => `<button class="chip x" data-act="chip-search" data-v="${r}">${esc(r)}</button>`).join('')}</div>`}
-      ${recent.length ? `<h2 class="sec">Continue</h2><div class="hscroll">${recent.slice(0, 8).map(hcard).join('')}</div>` : ''}
-      <h2 class="sec">${ic('flame')} High-yield by subject</h2>
-      <div class="chips"><button class="chip x" data-go="#/yield/ALL">All</button>${PF.SUBJ.filter((c) => c !== 'PHA').map((c) => `<button class="chip" ${col(c)} data-go="#/yield/${c}"><i class="d"></i>${esc(SM[c].s)}</button>`).join('')}</div>
-      <p class="sub" style="margin:.1rem 0 .5rem;font-size:.78rem">Tap a subject for its high-yield lectures and most repeated PYQs, highest first.</p>
-      <h2 class="sec">${ic('flame')} High-yield lectures<span class="more" data-go="#/study">Plan →</span></h2>
-      <div class="hscroll">${top.map(hcard).join('')}</div>
-      <h2 class="sec">Most repeated PYQs</h2><div class="stack">${rep.map((q) => qCard(q)).join('')}</div>`;
+      ${rs.due ? `<div class="card" style="margin-top:.8rem;display:flex;align-items:center;gap:.8rem" data-go="#/quiz?due=1"><div style="font-size:1.6rem">🔔</div><div style="flex:1"><b>${rs.due} PYQ${rs.due > 1 ? 's' : ''} due for revision</b></div><span class="btn" style="padding:.5rem .9rem">Review</span></div>` : ''}
+      <div class="stack" style="margin-top:.9rem">
+        <div class="bigcard" style="--g:linear-gradient(135deg,#f97316,#ef4444)" data-go="#/hy"><div class="bi">${ic('flame')}</div><div class="bt"><h3>High-yield lectures</h3><p>Lectures with the most PYQs – pick a subject</p></div>${ic('chevR')}</div>
+        <div class="bigcard" style="--g:linear-gradient(135deg,#6366f1,#8b5cf6)" data-go="#/rp"><div class="bi">${ic('shuffle')}</div><div class="bt"><h3>Most repeated PYQs</h3><p>Questions asked again and again – pick a subject</p></div>${ic('chevR')}</div>
+      </div>
+      ${st.pins.length ? `<h2 class="sec">${ic('bookmark')} Pinned searches</h2><div class="chips">${st.pins.map((r) => `<button class="chip" data-act="chip-search" data-v="${esc(r)}">${esc(r)}</button>`).join('')}</div>` : ''}
+      ${st.recentS.length ? `<h2 class="sec">Recent searches</h2><div class="chips">${st.recentS.map((r) => `<button class="chip x" data-act="chip-search" data-v="${esc(r)}">${ic('clock', 'sm')}${esc(r)}</button>`).join('')}<button class="chip" data-act="clear-recent">Clear</button></div>` : ''}`;
   };
   const hcard = (l) => `<div class="hcard" ${col(l.s)} data-go="#/lecture/${l.id}"><span class="k">${esc(SM[l.s].s)} · L${l.n}</span><h4>${esc(l.t)}</h4><span class="sub">${fmt(l.m)} · <b>${l.pq}</b> PYQs</span>${st.watched[l.id] ? '<span class="via">✓ watched</span>' : ''}</div>`;
 
@@ -433,24 +426,42 @@
       <button class="btn ghost block" style="margin-top:.6rem" data-act="qz-next" data-v="skip">Skip →</button>`;
   };
 
-  /* ---------- HIGH-YIELD BY SUBJECT ---------- */
-  const YV = { tab: 'lec', rank: 'pq', lim: { lec: 30, q: 20 } };
-  const viewYield = (v, c) => {
-    c = c === 'ALL' || SM[c] ? c : 'ALL';
-    setTop('High-yield', true); drawTabs('search');
-    const lecs = PF.lecs.filter((l) => l.pq && (c === 'ALL' || l.s === c));
-    lecs.sort(YV.rank === 'hr' ? (a, b) => b.yield - a.yield || b.pq - a.pq : (a, b) => b.pq - a.pq || b.asks - a.asks || b.yield - a.yield);
-    const qs = PF.qs.filter((q) => c === 'ALL' || q.L.some((x) => x.l.s === c) || q.u === c).sort((a, b) => b.n - a.n || b.ymax - a.ymax);
-    const name = c === 'ALL' ? 'All subjects' : SM[c].n;
-    v.innerHTML = `<div class="hero fade" ${c === 'ALL' ? '' : col(c)}><div class="k">High-yield</div><h1>${esc(name)}</h1><div class="meta"><span>${lecs.length} lectures with PYQs</span><span>${qs.length} PYQs</span></div></div>
-      <div class="chips" style="margin-top:.7rem"><button class="chip ${c === 'ALL' ? 'on' : ''}" data-go="#/yield/ALL">All</button>${PF.SUBJ.filter((x) => x !== 'PHA').map((x) => `<button class="chip ${c === x ? 'on' : ''}" ${col(x)} data-go="#/yield/${x}"><i class="d"></i>${esc(SM[x].s)}</button>`).join('')}</div>
-      ${seg([['lec', 'High-yield lectures', lecs.length], ['q', 'Most repeated PYQs', qs.length]], YV.tab, 'yv-tab')}
-      ${YV.tab === 'lec' ? `<div class="ctrl" style="margin:.7rem 0">${seg([['pq', 'Most PYQs'], ['hr', 'PYQs per hour']], YV.rank, 'yv-rank', 'style="flex:1"')}</div>
-        <div class="stack">${lecs.slice(0, YV.lim.lec).map((l, i) => `<div><div class="qref" style="display:inline-block;margin:0 0 .25rem .2rem">#${i + 1}${YV.rank === 'hr' ? ' · ' + l.yield.toFixed(1) + ' PYQ/hr' : ''}</div>${lecRow(l, { showSubj: c === 'ALL' })}</div>`).join('')}</div>
-        ${lecs.length > YV.lim.lec ? `<button class="btn ghost more-btn" data-act="yv-more" data-v="lec">Show more (${lecs.length - YV.lim.lec} left)</button>` : ''}`
-      : `<p class="sub" style="margin:.7rem 0">Sorted by how many times each question was asked (most first).</p>
-        <div class="stack">${qs.slice(0, YV.lim.q).map((q, i) => `<div><div class="qref" style="display:inline-block;margin:0 0 .25rem .2rem">#${i + 1} · asked ${q.n}×</div>${qCard(q)}</div>`).join('')}</div>
-        ${qs.length > YV.lim.q ? `<button class="btn ghost more-btn" data-act="yv-more" data-v="q">Show more (${qs.length - YV.lim.q} left)</button>` : ''}`}`;
+  /* ---------- HIGH-YIELD / MOST REPEATED: subject picker, then list ---------- */
+  const YV = { rank: 'pq', ty: '', lim: { hy: 30, rp: 20 } };
+  const viewPicker = (v, kind) => {
+    const hy = kind === 'hy';
+    setTop(hy ? 'High-yield lectures' : 'Most repeated PYQs', true); drawTabs('search');
+    const cards = ['ALL', ...PF.SUBJ.filter((c) => c !== 'PHA')].map((c) => {
+      let stat;
+      if (hy) {
+        const L = PF.lecs.filter((l) => l.pq && (c === 'ALL' || l.s === c)).sort((x, y) => y.pq - x.pq);
+        stat = `${L.length} lectures with PYQs${L[0] ? ` · top: ${esc(L[0].t)} (${L[0].pq})` : ''}`;
+      } else {
+        const Q = PF.qs.filter((q) => c === 'ALL' || q.L.some((x) => x.l.s === c) || q.u === c); const mx = Math.max(0, ...Q.map((q) => q.n));
+        stat = `${Q.length} PYQs · most repeated ${mx}×`;
+      }
+      return `<div class="sj fade" ${c === 'ALL' ? 'style="--c:#4f46e5"' : col(c)} data-go="#/${kind}/${c}"><div style="display:flex;align-items:center;gap:.6rem"><h3 style="flex:1">${c === 'ALL' ? 'All subjects' : esc(SM[c].n)}</h3>${ic('chevR')}</div><div class="st">${stat}</div></div>`;
+    }).join('');
+    v.innerHTML = `<p class="sub" style="margin:.2rem 0 .8rem">${hy ? 'Choose a subject to see its lectures from most to least PYQs.' : 'Choose a subject to see its questions from most to least repeated.'}</p><div class="stack">${cards}</div>`;
+  };
+  const viewYield = (v, kind, c) => {
+    c = c === 'ALL' || SM[c] ? c : 'ALL'; const hy = kind === 'hy';
+    setTop(c === 'ALL' ? 'All subjects' : SM[c].n, true); drawTabs('search');
+    const name = hy ? 'High-yield lectures' : 'Most repeated PYQs';
+    if (hy) {
+      const lecs = PF.lecs.filter((l) => l.pq && (c === 'ALL' || l.s === c));
+      lecs.sort(YV.rank === 'hr' ? (a, b) => b.yield - a.yield || b.pq - a.pq : (a, b) => b.pq - a.pq || b.asks - a.asks || b.yield - a.yield);
+      v.innerHTML = `<div class="hero fade" ${c === 'ALL' ? '' : col(c)}><div class="k">${name}</div><h1>${c === 'ALL' ? 'All subjects' : esc(SM[c].n)}</h1><div class="meta"><span>${lecs.length} lectures</span><span>most PYQs first</span></div></div>
+        <div class="ctrl" style="margin:.8rem 0">${seg([['pq', 'By number of PYQs'], ['hr', 'By PYQs per hour']], YV.rank, 'yv-rank', 'style="flex:1"')}</div>
+        <div class="stack">${lecs.slice(0, YV.lim.hy).map((l, i) => `<div><div class="qref" style="display:inline-block;margin:0 0 .25rem .2rem">#${i + 1} · ${l.pq} PYQs · asked ${l.asks}×${YV.rank === 'hr' ? ' · ' + l.yield.toFixed(1) + '/hr' : ''}</div>${lecRow(l, { showSubj: c === 'ALL' })}</div>`).join('')}</div>
+        ${lecs.length > YV.lim.hy ? `<button class="btn ghost more-btn" data-act="yv-more" data-v="hy">Show more (${lecs.length - YV.lim.hy} left)</button>` : ''}`;
+    } else {
+      const qs = PF.qs.filter((q) => (c === 'ALL' || q.L.some((x) => x.l.s === c) || q.u === c) && (!YV.ty || q.ty === YV.ty)).sort((a, b) => b.n - a.n || b.ymax - a.ymax);
+      v.innerHTML = `<div class="hero fade" ${c === 'ALL' ? '' : col(c)}><div class="k">${name}</div><h1>${c === 'ALL' ? 'All subjects' : esc(SM[c].n)}</h1><div class="meta"><span>${qs.length} PYQs</span><span>most repeated first</span></div></div>
+        <div class="ctrl" style="margin:.8rem 0">${seg([['', 'All'], ['L', 'Essay'], ['S', 'Short note']], YV.ty, 'yv-ty', 'style="flex:1"')}</div>
+        <div class="stack">${qs.slice(0, YV.lim.rp).map((q, i) => `<div><div class="qref" style="display:inline-block;margin:0 0 .25rem .2rem">#${i + 1} · asked ${q.n}× · ${q.ty === 'L' ? 'Essay' : 'Short note'} · ${[...new Set(q.occ.map((o) => o.yn).filter(Boolean))].sort((x, y) => y - x).join(', ') || 'undated'}</div>${qCard(q)}</div>`).join('')}</div>
+        ${qs.length > YV.lim.rp ? `<button class="btn ghost more-btn" data-act="yv-more" data-v="rp">Show more (${qs.length - YV.lim.rp} left)</button>` : ''}`;
+    }
   };
   /* ---------- TRENDS ---------- */
   const TR = { s: 'MED', by: 'lec', sort: 'total' };
@@ -580,9 +591,9 @@
       copyText(q.t + '\n— ' + q.occ.map((o) => o.y + ' ' + o.p + ' ' + o.ref).join('; ') + (q.L.length ? '\nLecture: ' + q.L.map((x) => SM[x.l.s].s + ' L' + x.l.n + ' ' + x.l.t).join(' | ') : ''));
     },
     'copy-l'(a) { const l = PF.lecById[a.dataset.id]; copyText(SM[l.s].n + ' · Lecture ' + l.n + ' · ' + l.t + ' (' + fmt(l.m) + ')'); },
-    'yv-tab'(a) { YV.tab = a.dataset.v; rerender(); },
+    'yv-ty'(a) { YV.ty = a.dataset.v; rerender(); },
     'yv-rank'(a) { YV.rank = a.dataset.v; rerender(); },
-    'yv-more'(a) { YV.lim[a.dataset.v] += a.dataset.v === 'lec' ? 30 : 20; rerender(); },
+    'yv-more'(a) { YV.lim[a.dataset.v] += a.dataset.v === 'hy' ? 30 : 20; rerender(); },
     'tr-s'(a) { TR.s = a.dataset.v; rerender(); },
     'tr-by'(a) { TR.by = a.dataset.v; rerender(); },
     'sv-sort'(a) { SV.sort = a.dataset.v; rerender(); },
@@ -677,7 +688,8 @@
     else if (r === 'quiz') viewQuiz(v, params);
     else if (r === 'saved') viewSaved(v);
     else if (r === 'trends') viewTrends(v, params);
-    else if (r === 'yield') viewYield(v, parts[1] || 'ALL');
+    else if (r === 'hy' || r === 'rp') { if (parts[1]) viewYield(v, r, parts[1]); else viewPicker(v, r); }
+    else if (r === 'yield') viewYield(v, 'hy', parts[1] || 'ALL');
     else viewHome(v);
     const key = location.hash || '#/';
     if (keepScroll) window.scrollTo(0, y); else if (!fwd && scrolls[key] !== undefined) window.scrollTo(0, scrolls[key]); else if (r !== 'paper' || !params.hl) window.scrollTo(0, 0);
