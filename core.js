@@ -15,7 +15,7 @@
   PF.yearNum = yearNum;
 
   /* ---------- subjects ---------- */
-  PF.VERSION = 'v8';
+  PF.VERSION = 'v7';
   PF.SM = {
     MED: { n: 'General Medicine', s: 'Medicine', c: '#ef4444', al: 'medicine internal medicine gen med physician' },
     SUR: { n: 'General Surgery', s: 'Surgery', c: '#0ea5e9', al: 'surgery' },
