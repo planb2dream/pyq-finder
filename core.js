@@ -15,7 +15,7 @@
   PF.yearNum = yearNum;
 
   /* ---------- subjects ---------- */
-  PF.VERSION = 'v6';
+  PF.VERSION = 'v7';
   PF.SM = {
     MED: { n: 'General Medicine', s: 'Medicine', c: '#ef4444', al: 'medicine internal medicine gen med physician' },
     SUR: { n: 'General Surgery', s: 'Surgery', c: '#0ea5e9', al: 'surgery' },
@@ -84,7 +84,7 @@
     recent: [], recentS: [],
     settings: { theme: 'system', size: 'm' },
     filters: { subj: [], src: '', yFrom: 0, yTo: 0, type: '', minN: 1, hideRel: false, status: '' },
-    plan: { hours: 4, days: 0, order: 'yield', onlyPYQ: true, subj: [] },
+    plan: { hours: 4, days: 0, order: 'yield', onlyPYQ: true, subj: [], mode: 'mix', seed: 0 },
   });
   let st = def();
   try {
@@ -125,6 +125,52 @@
     PF.save();
   };
 
+  /* ---------- study queue: connected lectures (same section, in course order) ---------- */
+  const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  PF.buildQueue = (P) => {
+    const sel = P.subj.length ? P.subj : PF.SUBJ;
+    const daily = Math.max(30, P.hours * 60);
+    const day = Math.floor(Date.now() / 864e5);
+    const seqOf = (c) => {
+      const L = PF.subjStats[c].L.filter((l) => !st.watched[l.id] && (!P.onlyPYQ || l.pq));
+      const secs = new Map(); L.forEach((l) => { if (!secs.has(l.sec)) secs.set(l.sec, []); secs.get(l.sec).push(l); });
+      const arr = [...secs.values()];
+      if (P.mode === 'rand') {
+        const rnd = mulberry(parseInt(hash(c + '|' + day + '|' + P.seed), 36) || 1);
+        for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+      } else if (P.order === 'yield') {
+        const tot = (a) => a.reduce((x, l) => x + l.pq, 0);
+        arr.sort((a, b) => tot(b) - tot(a) || a[0].i - b[0].i);
+      }
+      return arr.flat();   /* when a section runs out, the next section continues */
+    };
+    let seqs = sel.map((c) => ({ c, q: seqOf(c), pos: 0, taken: [] }));
+    if (P.mode !== 'seq' && seqs.length > 1) { const r = day % seqs.length; seqs = seqs.slice(r).concat(seqs.slice(0, r)); }
+    let acc = 0;
+    const take = (s, budget) => {
+      let used = 0;
+      while (s.pos < s.q.length) {
+        const l = s.q[s.pos];
+        if (used > 0 && used + l.m > budget * 1.25) break;
+        if (acc + used + l.m > daily * 1.2 && acc + used > 0) break;
+        s.taken.push(l); s.pos++; used += l.m;
+        if (used >= budget) break;
+      }
+      return used;
+    };
+    if (P.mode === 'seq') { seqs.forEach((s) => { if (acc < daily * 0.95) acc += take(s, daily - acc); }); }
+    else {
+      const quota = daily / seqs.length;
+      seqs.forEach((s) => { acc += take(s, quota); });
+      let added = true;
+      while (added && acc < daily * 0.9) {
+        added = false;
+        for (const s of seqs) { const l = s.q[s.pos]; if (l && acc + l.m <= daily * 1.15) { s.taken.push(l); s.pos++; acc += l.m; added = true; } if (acc >= daily * 0.9) break; }
+      }
+    }
+    if (P.mode !== 'seq') seqs.sort((a, b) => sel.indexOf(a.c) - sel.indexOf(b.c));
+    return { list: seqs.flatMap((s) => s.taken), acc };
+  };
   /* ---------- filters ---------- */
   PF.activeFilterCount = (F) => (F.subj.length ? 1 : 0) + (F.src ? 1 : 0) + (F.yFrom || F.yTo ? 1 : 0) + (F.type ? 1 : 0) + (F.minN > 1 ? 1 : 0) + (F.hideRel ? 1 : 0) + (F.status ? 1 : 0);
   const qLevel = (F) => !!(F.src || F.yFrom || F.yTo || F.type || F.minN > 1 || F.hideRel);

@@ -170,6 +170,9 @@
       ${st.pins.length ? `<h2 class="sec">${ic('bookmark')} Pinned topics</h2><div class="chips">${st.pins.map((r) => `<button class="chip" data-act="chip-search" data-v="${esc(r)}">${esc(r)}</button>`).join('')}</div>` : ''}
       ${st.recentS.length ? `<h2 class="sec">Recent searches</h2><div class="chips">${st.recentS.map((r) => `<button class="chip x" data-act="chip-search" data-v="${esc(r)}">${ic('clock', 'sm')}${esc(r)}</button>`).join('')}<button class="chip" data-act="clear-recent">Clear</button></div>` : `<h2 class="sec">Try searching</h2><div class="chips">${['cirrhosis', 'DKA', 'breast', 'fracture', 'hypertension', 'PPH', 'cataract', 'tubal patency', '2019'].map((r) => `<button class="chip x" data-act="chip-search" data-v="${r}">${esc(r)}</button>`).join('')}</div>`}
       ${recent.length ? `<h2 class="sec">Continue</h2><div class="hscroll">${recent.slice(0, 8).map(hcard).join('')}</div>` : ''}
+      <h2 class="sec">${ic('flame')} High-yield by subject</h2>
+      <div class="chips"><button class="chip x" data-go="#/yield/ALL">All</button>${PF.SUBJ.filter((c) => c !== 'PHA').map((c) => `<button class="chip" ${col(c)} data-go="#/yield/${c}"><i class="d"></i>${esc(SM[c].s)}</button>`).join('')}</div>
+      <p class="sub" style="margin:.1rem 0 .5rem;font-size:.78rem">Tap a subject for its high-yield lectures and most repeated PYQs, highest first.</p>
       <h2 class="sec">${ic('flame')} High-yield lectures<span class="more" data-go="#/study">Plan →</span></h2>
       <div class="hscroll">${top.map(hcard).join('')}</div>
       <h2 class="sec">Most repeated PYQs</h2><div class="stack">${rep.map((q) => qCard(q)).join('')}</div>`;
@@ -356,9 +359,7 @@
     let pool = PF.lecs.filter((l) => sel.includes(l.s) && !st.watched[l.id] && (!P.onlyPYQ || l.pq));
     const rem = pool.reduce((a, l) => a + l.m, 0);
     const daily = Math.max(30, P.hours * 60);
-    const order = P.order === 'yield' ? (a, b) => b.yield - a.yield || b.pq - a.pq : (a, b) => a.i - b.i;
-    pool = [...pool].sort(order);
-    const today = []; let acc = 0; for (const l of pool) { if (acc + l.m > daily && today.length) { if (acc >= daily * 0.8) break; else continue; } today.push(l); acc += l.m; if (acc >= daily) break; }
+    const Q = PF.buildQueue(P); const today = Q.list; const acc = Q.acc;
     const ex = PF.examDays(); const days = ex > 0 ? ex : P.days; const need = days ? rem / 60 / days : 0; const rs = PF.revStats();
     v.innerHTML = `<div class="hero homehero fade" style="display:flex;gap:1rem;align-items:center"><div style="flex:1;position:relative;z-index:1"><div class="k">Your progress</div><h1>${watched.length} / ${PF.lecs.length} lectures</h1><p>${fmt(wm)} of ${fmt(PF.totalMin)} watched</p></div><div class="ring" style="--p:${pct}"><b>${pct}%</b></div></div>
       <h2 class="sec">${ic('clock')} Spaced revision</h2>
@@ -377,14 +378,17 @@
         ${ex > 0 ? `<p class="sub" style="margin-top:.7rem">Using your exam date: <b>${ex} days</b> left.</p>` : `<label class="sub" style="font-weight:800;display:block;margin-top:.7rem">Days left to exam (or set a date above)</label>
         <input class="fld" id="p-d" type="number" min="0" inputmode="numeric" placeholder="e.g. 45" value="${P.days || ''}">`}
         <div class="chips" style="margin-top:.8rem">${PF.SUBJ.map((c) => `<button class="chip ${P.subj.includes(c) ? 'on' : ''}" data-act="p-subj" data-v="${c}">${esc(SM[c].s)}</button>`).join('')}</div>
-        <div class="ctrl" style="margin-top:.4rem">${seg([['yield', 'High-yield first'], ['course', 'Course order']], P.order, 'p-order', 'style="flex:1"')}</div>
+        <label class="sub" style="font-weight:800;display:block;margin:.6rem 0 .3rem">How to build today's queue</label>
+        ${seg([['mix', 'Mixed'], ['seq', 'Subject by subject'], ['rand', 'Random']], P.mode, 'p-mode')}
+        <p class="sub" style="font-size:.76rem;margin:.4rem 0">${P.mode === 'mix' ? 'Time is shared across the selected subjects.' : P.mode === 'seq' ? 'Finishes one selected subject, then the next (in the order you tapped them).' : 'Random sections from each selected subject, shared across them.'} Lectures always come from one section in course order (Part 1, then Part 2…); when a section ends, the next one continues.</p>
+        ${P.mode === 'rand' ? '<button class="btn ghost block" data-act="p-shuffle" style="margin-bottom:.4rem">' + ic('shuffle', 'sm') + ' Reshuffle</button>' : `<div class="ctrl">${seg([['yield', 'High-yield sections first'], ['course', 'Course order']], P.order, 'p-order', 'style="flex:1"')}</div>`}
         <div style="margin-top:.7rem">${tog(P.onlyPYQ, 'p-only', 'Skip lectures with no PYQ')}</div>
         <div style="margin-top:.8rem;border-top:1px solid var(--line);padding-top:.6rem">
           <div class="kv"><span>Remaining</span><b>${pool.length} lectures · ${fmt(rem)}</b></div>
           <div class="kv"><span>At ${P.hours} h/day you finish in</span><b>${Math.ceil(rem / daily)} days</b></div>
           ${days ? `<div class="kv"><span>To finish in ${days} days you need</span><b style="color:${need > P.hours ? 'var(--bad)' : 'var(--ok)'}">${need.toFixed(1)} h/day</b></div>` : ''}</div></div>
       <h2 class="sec">Today's queue<span class="sub">${fmt(acc)}</span></h2>
-      <div class="stack">${today.length ? today.map((l) => lecRow(l, { showSubj: true })).join('') : '<div class="empty">Nothing left – great job! 🎉</div>'}</div>
+      <div class="stack">${today.length ? today.map((l, i) => ((i === 0 || l.s !== today[i - 1].s || l.sec !== today[i - 1].sec) ? `<div class="qgroup" style="margin:.3rem 0 -.2rem"><h3 style="margin:0">${esc(SM[l.s].s)} · ${esc(l.sec)}</h3></div>` : '') + lecRow(l)).join('') : '<div class="empty">Nothing left – great job! 🎉</div>'}</div>
       <h2 class="sec">${ic('shuffle')} Quick revision</h2>
       <div class="card" data-go="#/quiz"><b>PYQ flash-cards</b><p class="sub" style="margin-top:.2rem">Practise random PYQs, then reveal which lecture covers them. Open →</p></div>`;
     $('#p-h').addEventListener('change', (e) => { P.hours = +e.target.value; PF.save(); rerender(); });
@@ -429,6 +433,25 @@
       <button class="btn ghost block" style="margin-top:.6rem" data-act="qz-next" data-v="skip">Skip →</button>`;
   };
 
+  /* ---------- HIGH-YIELD BY SUBJECT ---------- */
+  const YV = { tab: 'lec', rank: 'pq', lim: { lec: 30, q: 20 } };
+  const viewYield = (v, c) => {
+    c = c === 'ALL' || SM[c] ? c : 'ALL';
+    setTop('High-yield', true); drawTabs('search');
+    const lecs = PF.lecs.filter((l) => l.pq && (c === 'ALL' || l.s === c));
+    lecs.sort(YV.rank === 'hr' ? (a, b) => b.yield - a.yield || b.pq - a.pq : (a, b) => b.pq - a.pq || b.asks - a.asks || b.yield - a.yield);
+    const qs = PF.qs.filter((q) => c === 'ALL' || q.L.some((x) => x.l.s === c) || q.u === c).sort((a, b) => b.n - a.n || b.ymax - a.ymax);
+    const name = c === 'ALL' ? 'All subjects' : SM[c].n;
+    v.innerHTML = `<div class="hero fade" ${c === 'ALL' ? '' : col(c)}><div class="k">High-yield</div><h1>${esc(name)}</h1><div class="meta"><span>${lecs.length} lectures with PYQs</span><span>${qs.length} PYQs</span></div></div>
+      <div class="chips" style="margin-top:.7rem"><button class="chip ${c === 'ALL' ? 'on' : ''}" data-go="#/yield/ALL">All</button>${PF.SUBJ.filter((x) => x !== 'PHA').map((x) => `<button class="chip ${c === x ? 'on' : ''}" ${col(x)} data-go="#/yield/${x}"><i class="d"></i>${esc(SM[x].s)}</button>`).join('')}</div>
+      ${seg([['lec', 'High-yield lectures', lecs.length], ['q', 'Most repeated PYQs', qs.length]], YV.tab, 'yv-tab')}
+      ${YV.tab === 'lec' ? `<div class="ctrl" style="margin:.7rem 0">${seg([['pq', 'Most PYQs'], ['hr', 'PYQs per hour']], YV.rank, 'yv-rank', 'style="flex:1"')}</div>
+        <div class="stack">${lecs.slice(0, YV.lim.lec).map((l, i) => `<div><div class="qref" style="display:inline-block;margin:0 0 .25rem .2rem">#${i + 1}${YV.rank === 'hr' ? ' · ' + l.yield.toFixed(1) + ' PYQ/hr' : ''}</div>${lecRow(l, { showSubj: c === 'ALL' })}</div>`).join('')}</div>
+        ${lecs.length > YV.lim.lec ? `<button class="btn ghost more-btn" data-act="yv-more" data-v="lec">Show more (${lecs.length - YV.lim.lec} left)</button>` : ''}`
+      : `<p class="sub" style="margin:.7rem 0">Sorted by how many times each question was asked (most first).</p>
+        <div class="stack">${qs.slice(0, YV.lim.q).map((q, i) => `<div><div class="qref" style="display:inline-block;margin:0 0 .25rem .2rem">#${i + 1} · asked ${q.n}×</div>${qCard(q)}</div>`).join('')}</div>
+        ${qs.length > YV.lim.q ? `<button class="btn ghost more-btn" data-act="yv-more" data-v="q">Show more (${qs.length - YV.lim.q} left)</button>` : ''}`}`;
+  };
   /* ---------- TRENDS ---------- */
   const TR = { s: 'MED', by: 'lec', sort: 'total' };
   const maxYear = Math.max(...PF.papers.map((p) => p.yn));
@@ -545,6 +568,7 @@
       const id = a.dataset.id; const on = !st.watched[id]; if (on) st.watched[id] = Date.now(); else delete st.watched[id]; PF.save();
       syncBtns('watch', id, on, 'Watched', 'Mark watched'); $$(`[data-go="#/lecture/${id}"]`).forEach((r) => r.classList.toggle('done', on && r.classList.contains('lec')));
       if (on) toast('Marked as watched');
+      if (location.hash.indexOf('#/study') === 0) rerender();
     },
     'star-l'(a) { const id = a.dataset.id; const on = !st.starL[id]; if (on) st.starL[id] = 1; else delete st.starL[id]; PF.save(); syncBtns('star-l', id, on); toast(on ? 'Lecture saved' : 'Removed'); },
     'star-q'(a) { const id = a.dataset.id; const on = !st.starQ[id]; if (on) st.starQ[id] = 1; else delete st.starQ[id]; PF.save(); syncBtns('star-q', id, on); toast(on ? 'PYQ saved' : 'Removed'); },
@@ -556,6 +580,9 @@
       copyText(q.t + '\n— ' + q.occ.map((o) => o.y + ' ' + o.p + ' ' + o.ref).join('; ') + (q.L.length ? '\nLecture: ' + q.L.map((x) => SM[x.l.s].s + ' L' + x.l.n + ' ' + x.l.t).join(' | ') : ''));
     },
     'copy-l'(a) { const l = PF.lecById[a.dataset.id]; copyText(SM[l.s].n + ' · Lecture ' + l.n + ' · ' + l.t + ' (' + fmt(l.m) + ')'); },
+    'yv-tab'(a) { YV.tab = a.dataset.v; rerender(); },
+    'yv-rank'(a) { YV.rank = a.dataset.v; rerender(); },
+    'yv-more'(a) { YV.lim[a.dataset.v] += a.dataset.v === 'lec' ? 30 : 20; rerender(); },
     'tr-s'(a) { TR.s = a.dataset.v; rerender(); },
     'tr-by'(a) { TR.by = a.dataset.v; rerender(); },
     'sv-sort'(a) { SV.sort = a.dataset.v; rerender(); },
@@ -573,6 +600,8 @@
     's-restore-go'() { try { PF.importState($('#rt').value.trim()); applyTheme(); toast('Progress restored'); closeSheet(); rerender(); } catch (e) { toast('Invalid backup text'); } },
     's-reset'() { if (confirm('Erase all watched marks, saved items and notes on this device?')) { PF.resetState(); applyTheme(); closeSheet(); toast('Progress reset'); rerender(); } },
     'p-subj'(a) { const P = st.plan, c = a.dataset.v; P.subj = P.subj.includes(c) ? P.subj.filter((x) => x !== c) : [...P.subj, c]; PF.save(); rerender(); },
+    'p-mode'(a) { st.plan.mode = a.dataset.v; PF.save(); rerender(); },
+    'p-shuffle'() { st.plan.seed++; PF.save(); rerender(); toast('Queue reshuffled'); },
     'p-order'(a) { st.plan.order = a.dataset.v; PF.save(); rerender(); },
     'p-only'() { st.plan.onlyPYQ = !st.plan.onlyPYQ; PF.save(); rerender(); },
     'qz-ty'(a) { QZ.ty = a.dataset.v; $$('.seg button[data-act="qz-ty"]').forEach((b) => b.classList.toggle('on', b === a)); },
@@ -648,6 +677,7 @@
     else if (r === 'quiz') viewQuiz(v, params);
     else if (r === 'saved') viewSaved(v);
     else if (r === 'trends') viewTrends(v, params);
+    else if (r === 'yield') viewYield(v, parts[1] || 'ALL');
     else viewHome(v);
     const key = location.hash || '#/';
     if (keepScroll) window.scrollTo(0, y); else if (!fwd && scrolls[key] !== undefined) window.scrollTo(0, scrolls[key]); else if (r !== 'paper' || !params.hl) window.scrollTo(0, 0);
