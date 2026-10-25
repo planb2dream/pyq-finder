@@ -231,3 +231,4 @@ input[type=range]{width:100%;accent-color:var(--brand)}
 .bigcard .bi{width:3rem;height:3rem;border-radius:16px;background:rgba(255,255,255,.22);display:grid;place-items:center;flex:none}
 .bigcard .bi .ic{width:1.6rem;height:1.6rem}
 .bigcard .bt{flex:1}.bigcard h3{font-size:1.1rem;font-weight:800}.bigcard p{font-size:.82rem;opacity:.92;margin-top:.15rem}
+.seg button{white-space:normal;line-height:1.2;font-size:.8rem}

@@ -141,7 +141,7 @@
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { inp.blur(); pushRecent(S.q); } });
     updateHome();
   };
-  const pushRecent = (q) => { q = q.trim(); if (q.length < 2) return; st.recentS = [q, ...st.recentS.filter((x) => x.toLowerCase() !== q.toLowerCase())].slice(0, 8); PF.save(); };
+  const pushRecent = (q) => { q = q.trim(); if (q.length < 2) return; PF.pushHist('search', q); st.recentS = [q, ...st.recentS.filter((x) => x.toLowerCase() !== q.toLowerCase())].slice(0, 8); PF.save(); };
 
   const updateHome = () => {
     const hb = $('#hb'); if (!hb) return;
@@ -163,7 +163,9 @@
         <p>${PF.qs.length.toLocaleString()} questions · ${PF.lecs.length} lectures</p>${ex > 0 ? `<p style="font-weight:800;margin-top:.4rem">📅 ${ex} day${ex === 1 ? '' : 's'} to exam</p>` : ''}</div>
         <div class="ring" style="--p:${pct}"><b>${pct}%</b></div></div>
       ${rs.due ? `<div class="card" style="margin-top:.8rem;display:flex;align-items:center;gap:.8rem" data-go="#/quiz?due=1"><div style="font-size:1.6rem">🔔</div><div style="flex:1"><b>${rs.due} PYQ${rs.due > 1 ? 's' : ''} due for revision</b></div><span class="btn" style="padding:.5rem .9rem">Review</span></div>` : ''}
-      <div class="stack" style="margin-top:.9rem">
+      ${continueHTML()}
+      <h2 class="sec">Explore</h2>
+      <div class="stack">
         <div class="bigcard" style="--g:linear-gradient(135deg,#f97316,#ef4444)" data-go="#/hy"><div class="bi">${ic('flame')}</div><div class="bt"><h3>High-yield lectures</h3><p>Lectures with the most PYQs – pick a subject</p></div>${ic('chevR')}</div>
         <div class="bigcard" style="--g:linear-gradient(135deg,#6366f1,#8b5cf6)" data-go="#/rp"><div class="bi">${ic('shuffle')}</div><div class="bt"><h3>Most repeated PYQs</h3><p>Questions asked again and again – pick a subject</p></div>${ic('chevR')}</div>
       </div>
@@ -200,6 +202,8 @@
     if (res.subj.length) h += `<div class="chips">${res.subj.map((s) => `<button class="chip" ${col(s)} data-go="#/subject/${s}"><i class="d"></i>Open ${esc(SM[s].n)} →</button>`).join('')}</div>`;
     if (res.missing.length) h += `<p class="sub" style="margin:.2rem 0 .5rem">No match for “${esc(res.missing.join(' '))}” – showing the rest.</p>`;
     if (res.relaxed) h += `<div class="card" style="padding:.7rem .9rem;margin-bottom:.7rem;font-size:.85rem">No exact match for all words – showing <b>partial matches</b>.</div>`;
+    const fs = st.filters.subj.length === 1 ? st.filters.subj[0] : st.filters.subj.length ? '*' : 'ALL';
+    h += `<div class="chips"><button class="chip ${fs === 'ALL' ? 'on' : ''}" data-act="q-subj" data-v="ALL">All</button>${PF.SUBJ.filter((x) => x !== 'PHA').map((x) => `<button class="chip ${fs === x ? 'on' : ''}" ${col(x)} data-act="q-subj" data-v="${x}"><i class="d"></i>${esc(SM[x].s)}</button>`).join('')}</div>`;
     h += seg([['all', 'All'], ['lec', 'Lectures', c.lec], ['q', 'PYQs', c.q], ['p', 'Papers', c.p]], S.tab, 'rtab');
     if (!c.lec && !c.q && !c.p) {
       return h + `<div class="empty"><div class="big">🔎</div><b>No results</b><p class="sub" style="margin-top:.3rem">Try fewer words or an abbreviation (DKA, PPH, MI…).${filtersActive() ? '<br>Active filters may be hiding results.' : ''}</p>${filtersActive() ? '<button class="btn ghost" style="margin-top:1rem" data-act="clear-filters">Clear filters</button>' : ''}</div>`;
@@ -225,6 +229,38 @@
     return h;
   };
 
+  /* subject chip row (like the screenshot): All + subjects */
+  const subjChips = (cur, hrefFn, withAll = true) => `<div class="chips" style="margin:.7rem 0 .2rem">${withAll ? `<button class="chip ${cur === 'ALL' ? 'on' : ''}" data-go="${hrefFn('ALL')}">All</button>` : ''}${PF.SUBJ.filter((x) => x !== 'PHA').map((x) => `<button class="chip ${cur === x ? 'on' : ''}" ${col(x)} data-go="${hrefFn(x)}"><i class="d"></i>${esc(SM[x].s)}</button>`).join('')}</div>`;
+  /* ---------- HISTORY / CONTINUE ---------- */
+  const ago = (ts) => { const m = Math.round((Date.now() - ts) / 60000); if (m < 1) return 'just now'; if (m < 60) return m + ' min ago'; const h = Math.round(m / 60); if (h < 24) return h + ' h ago'; const d = Math.round(h / 24); return d + (d === 1 ? ' day ago' : ' days ago'); };
+  const histInfo = (h) => {
+    if (h.k === 'lec') { const l = PF.lecById[h.id]; return l && { i: 'play', t: l.t, s: SM[l.s].s + ' · Lecture ' + l.n + ' · ' + l.sec, go: '#/lecture/' + l.id, c: SM[l.s].c, g: 'lec' }; }
+    if (h.k === 'paper') { const p = PF.paperById[h.id]; return p && { i: 'file', t: p.id + ' · ' + p.y, s: p.g + ' · ' + p.title, go: '#/paper/' + p.id, c: '#4f46e5', g: 'paper' }; }
+    if (h.k === 'subject') return SM[h.id] && { i: 'layers', t: SM[h.id].n, s: 'Subject lectures', go: '#/subject/' + h.id, c: SM[h.id].c, g: 'list' };
+    if (h.k === 'hy' || h.k === 'rp') return { i: h.k === 'hy' ? 'flame' : 'shuffle', t: h.k === 'hy' ? 'High-yield lectures' : 'Most repeated PYQs', s: h.id === 'ALL' ? 'All subjects' : (SM[h.id] || {}).n, go: '#/' + h.k + '/' + h.id, c: h.id === 'ALL' ? '#4f46e5' : (SM[h.id] || {}).c, g: 'list' };
+    if (h.k === 'search') return { i: 'search', t: '“' + h.id + '”', s: 'Search', act: h.id, c: '#4f46e5', g: 'search' };
+    return null;
+  };
+  const histRow = (h, x) => `<div class="lec" ${x.act ? `data-act="chip-search" data-v="${esc(x.act)}"` : `data-go="${x.go}"`} style="--c:${x.c}"><div class="num">${ic(x.i, 'sm')}</div><div class="mn"><h4>${esc(x.t)}</h4><p>${esc(x.s)} · ${ago(h.ts)}</p></div>${ic('chevR', 'sm')}</div>`;
+  const continueHTML = () => {
+    const H = st.hist.map((h) => ({ h, x: histInfo(h) })).filter((o) => o.x);
+    if (!H.length) return '';
+    const f = H[0];
+    return `<h2 class="sec">Continue<span class="more" data-go="#/history">History →</span></h2>
+      <div class="bigcard" style="--g:linear-gradient(135deg,${f.x.c},color-mix(in srgb,${f.x.c} 55%,#7c3aed))" ${f.x.act ? `data-act="chip-search" data-v="${esc(f.x.act)}"` : `data-go="${f.x.go}"`}><div class="bi">${ic(f.x.i)}</div><div class="bt"><p style="margin:0 0 .15rem;font-weight:700;text-transform:uppercase;font-size:.68rem;letter-spacing:.06em">Last opened · ${ago(f.h.ts)}</p><h3>${esc(f.x.t)}</h3><p>${esc(f.x.s)}</p></div>${ic('chevR')}</div>
+      ${H.length > 1 ? `<div class="stack" style="margin-top:.6rem">${H.slice(1, 4).map((o) => histRow(o.h, o.x)).join('')}</div>` : ''}`;
+  };
+  const HV = { f: 'all' };
+  const viewHistory = (v) => {
+    setTop('History', true); drawTabs('search');
+    const H = st.hist.map((h) => ({ h, x: histInfo(h) })).filter((o) => o.x && (HV.f === 'all' || o.x.g === HV.f));
+    const day = (ts) => { const d = new Date(ts).setHours(0, 0, 0, 0), t = new Date().setHours(0, 0, 0, 0); return d === t ? 'Today' : d === t - 864e5 ? 'Yesterday' : new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
+    let last = '', body = '';
+    H.forEach((o) => { const d = day(o.h.ts); if (d !== last) { body += `<div class="qgroup"><h3>${d}</h3></div>`; last = d; } body += histRow(o.h, o.x); });
+    v.innerHTML = `${seg([['all', 'All'], ['lec', 'Lectures'], ['paper', 'Papers'], ['list', 'Lists'], ['search', 'Searches']], HV.f, 'hv-f')}
+      <div class="stack" style="margin-top:.8rem">${body || '<div class="empty"><div class="big">🕘</div>Nothing here yet. Lectures, papers and searches you open will appear here.</div>'}</div>
+      ${st.hist.length ? '<button class="btn danger block" style="margin-top:1rem" data-act="hv-clear">Clear history</button>' : ''}`;
+  };
   /* ---------- BROWSE ---------- */
   const viewBrowse = (v) => {
     setTop('Browse subjects'); drawTabs('browse');
@@ -248,6 +284,7 @@
     const w = s.L.filter((l) => st.watched[l.id]);
     v.innerHTML = `<div class="hero fade" ${col(c)}><div class="k">Subject</div><h1>${esc(SM[c].n)}</h1>
       <div class="meta"><span>${s.n} lectures</span><span>${fmt(s.m)}</span><span>${s.pq} PYQs</span><span>${w.length} watched</span></div></div>
+      ${subjChips(c, (x) => '#/subject/' + x, false)}
       <div class="searchwrap" style="top:calc(var(--sat) + 3.4rem);margin-top:.4rem"><div class="search">${ic('search')}<input id="sq" placeholder="Filter lectures in ${esc(SM[c].s)}…" value="${esc(SV.q)}" autocomplete="off"></div></div>
       <div class="ctrl" style="margin-bottom:.7rem">${seg([['course', 'Course order'], ['pq', 'Most PYQs'], ['yield', 'High yield']], SV.sort, 'sv-sort', 'style="flex:1"')}</div>
       <div class="ctrl" style="margin-bottom:.7rem">${tog(SV.only, 'sv-only', 'Only lectures with PYQs')}
@@ -342,6 +379,7 @@
   };
 
   /* ---------- STUDY ---------- */
+  const ST = { tab: 'plan' };
   const viewStudy = (v) => {
     setTop('Study', false); drawTabs('study');
     const P = st.plan;
@@ -355,6 +393,8 @@
     const Q = PF.buildQueue(P); const today = Q.list; const acc = Q.acc;
     const ex = PF.examDays(); const days = ex > 0 ? ex : P.days; const need = days ? rem / 60 / days : 0; const rs = PF.revStats();
     v.innerHTML = `<div class="hero homehero fade" style="display:flex;gap:1rem;align-items:center"><div style="flex:1;position:relative;z-index:1"><div class="k">Your progress</div><h1>${watched.length} / ${PF.lecs.length} lectures</h1><p>${fmt(wm)} of ${fmt(PF.totalMin)} watched</p></div><div class="ring" style="--p:${pct}"><b>${pct}%</b></div></div>
+      ${seg([['plan', 'Planner'], ['rev', 'Revision'], ['prog', 'Progress']], ST.tab, 'st-tab')}
+      ${ST.tab === 'rev' ? `
       <h2 class="sec">${ic('clock')} Spaced revision</h2>
       <div class="card"><div style="display:flex;gap:.5rem;text-align:center">${[['Due today', rs.due, 'var(--bad)'], ['Next 7 days', rs.week, 'var(--warn)'], ['Learning', rs.learning, 'var(--brand)'], ['Mastered', rs.mastered, 'var(--ok)']].map(([l, n, c]) => `<div style="flex:1"><div style="font-size:1.4rem;font-weight:800;color:${c}">${n}</div><div class="sub" style="font-size:.7rem">${l}</div></div>`).join('')}</div>
         <button class="btn block" style="margin-top:.9rem" data-go="#/quiz?due=1">${rs.due ? 'Review ' + rs.due + ' due now' : 'Nothing due – open review'}</button>
@@ -363,7 +403,13 @@
       <div class="card"><label class="sub" style="font-weight:800;display:block;margin-bottom:.3rem">Exam date</label><input class="fld" id="ex-d" type="date" value="${esc(st.exam)}">
         ${ex > 0 ? `<p style="margin-top:.6rem;font-weight:800;font-size:1.05rem">${ex} day${ex === 1 ? '' : 's'} to go</p>` : st.exam ? '<p class="sub" style="margin-top:.5rem">That date has passed.</p>' : ''}</div>
       <h2 class="sec">${ic('flame')} Topic trends</h2><div class="card" data-go="#/trends"><b>What’s hot vs fading</b><p class="sub" style="margin-top:.2rem">Heat-map of how often each lecture topic was asked over the years. Open →</p></div>
+      <h2 class="sec">${ic('shuffle')} Quick revision</h2>
+      <div class="card" data-go="#/quiz"><b>PYQ flash-cards</b><p class="sub" style="margin-top:.2rem">Practise random PYQs, then reveal which lecture covers them. Open →</p></div>
+      ` : ''}
+      ${ST.tab === 'prog' ? `
       <h2 class="sec">By subject</h2><div class="stack">${PF.SUBJ.map((c) => { const s = PF.subjStats[c]; const w = s.L.filter((l) => st.watched[l.id]); const m = w.reduce((a, l) => a + l.m, 0); return `<div class="card" ${col(c)} data-go="#/subject/${c}" style="padding:.7rem .9rem"><div style="display:flex;justify-content:space-between;font-weight:750;font-size:.88rem"><span>${esc(SM[c].n)}</span><span class="sub">${w.length}/${s.n}</span></div><div class="bar" style="margin:.45rem 0 .25rem"><i style="width:${Math.round((m / s.m) * 100)}%"></i></div><div class="sub" style="font-size:.74rem">${fmt(s.m - m)} left</div></div>`; }).join('')}</div>
+      ` : ''}
+      ${ST.tab === 'plan' ? `
       <h2 class="sec">${ic('target')} Study planner</h2>
       <div class="card">
         <label class="sub" style="font-weight:800">Daily study time: <b style="color:var(--ink)">${P.hours} h</b></label>
@@ -382,12 +428,11 @@
           ${days ? `<div class="kv"><span>To finish in ${days} days you need</span><b style="color:${need > P.hours ? 'var(--bad)' : 'var(--ok)'}">${need.toFixed(1)} h/day</b></div>` : ''}</div></div>
       <h2 class="sec">Today's queue<span class="sub">${fmt(acc)}</span></h2>
       <div class="stack">${today.length ? today.map((l, i) => ((i === 0 || l.s !== today[i - 1].s || l.sec !== today[i - 1].sec) ? `<div class="qgroup" style="margin:.3rem 0 -.2rem"><h3 style="margin:0">${esc(SM[l.s].s)} · ${esc(l.sec)}</h3></div>` : '') + lecRow(l)).join('') : '<div class="empty">Nothing left – great job! 🎉</div>'}</div>
-      <h2 class="sec">${ic('shuffle')} Quick revision</h2>
-      <div class="card" data-go="#/quiz"><b>PYQ flash-cards</b><p class="sub" style="margin-top:.2rem">Practise random PYQs, then reveal which lecture covers them. Open →</p></div>`;
-    $('#p-h').addEventListener('change', (e) => { P.hours = +e.target.value; PF.save(); rerender(); });
-    $('#p-h').addEventListener('input', (e) => { $('#p-h').previousElementSibling.innerHTML = 'Daily study time: <b style="color:var(--ink)">' + e.target.value + ' h</b>'; });
-    const pd = $('#p-d'); if (pd) pd.addEventListener('change', (e) => { P.days = Math.max(0, +e.target.value || 0); PF.save(); rerender(); });
-    $('#ex-d').addEventListener('change', (e) => { st.exam = e.target.value; PF.save(); rerender(); });
+      ` : ''}`;
+    const ph = $('#p-h'); if (ph) { ph.addEventListener('change', (e) => { P.hours = +e.target.value; PF.save(); rerender(); });
+    ph.addEventListener('input', (e) => { $('#p-h').previousElementSibling.innerHTML = 'Daily study time: <b style="color:var(--ink)">' + e.target.value + ' h</b>'; });
+    const pd = $('#p-d'); if (pd) pd.addEventListener('change', (e) => { P.days = Math.max(0, +e.target.value || 0); PF.save(); rerender(); }); }
+    const exd = $('#ex-d'); if (exd) exd.addEventListener('change', (e) => { st.exam = e.target.value; PF.save(); rerender(); });
   };
 
   /* ---------- QUIZ ---------- */
@@ -444,6 +489,11 @@
     }).join('');
     v.innerHTML = `<p class="sub" style="margin:.2rem 0 .8rem">${hy ? 'Choose a subject to see its lectures from most to least PYQs.' : 'Choose a subject to see its questions from most to least repeated.'}</p><div class="stack">${cards}</div>`;
   };
+  const yvBar = (kind, c) => {
+    const nl = PF.lecs.filter((l) => l.pq && (c === 'ALL' || l.s === c)).length;
+    const nq = PF.qs.filter((q) => c === 'ALL' || q.L.some((x) => x.l.s === c) || q.u === c).length;
+    return subjChips(c, (x) => '#/' + kind + '/' + x) + `<div style="margin:.5rem 0">${seg([['hy', 'High-yield lectures', nl], ['rp', 'Most repeated PYQs', nq]], kind, 'yv-kind')}</div>`;
+  };
   const viewYield = (v, kind, c) => {
     c = c === 'ALL' || SM[c] ? c : 'ALL'; const hy = kind === 'hy';
     setTop(c === 'ALL' ? 'All subjects' : SM[c].n, true); drawTabs('search');
@@ -452,12 +502,14 @@
       const lecs = PF.lecs.filter((l) => l.pq && (c === 'ALL' || l.s === c));
       lecs.sort(YV.rank === 'hr' ? (a, b) => b.yield - a.yield || b.pq - a.pq : (a, b) => b.pq - a.pq || b.asks - a.asks || b.yield - a.yield);
       v.innerHTML = `<div class="hero fade" ${c === 'ALL' ? '' : col(c)}><div class="k">${name}</div><h1>${c === 'ALL' ? 'All subjects' : esc(SM[c].n)}</h1><div class="meta"><span>${lecs.length} lectures</span><span>most PYQs first</span></div></div>
+        ${yvBar('hy', c)}
         <div class="ctrl" style="margin:.8rem 0">${seg([['pq', 'By number of PYQs'], ['hr', 'By PYQs per hour']], YV.rank, 'yv-rank', 'style="flex:1"')}</div>
         <div class="stack">${lecs.slice(0, YV.lim.hy).map((l, i) => `<div><div class="qref" style="display:inline-block;margin:0 0 .25rem .2rem">#${i + 1} · ${l.pq} PYQs · asked ${l.asks}×${YV.rank === 'hr' ? ' · ' + l.yield.toFixed(1) + '/hr' : ''}</div>${lecRow(l, { showSubj: c === 'ALL' })}</div>`).join('')}</div>
         ${lecs.length > YV.lim.hy ? `<button class="btn ghost more-btn" data-act="yv-more" data-v="hy">Show more (${lecs.length - YV.lim.hy} left)</button>` : ''}`;
     } else {
       const qs = PF.qs.filter((q) => (c === 'ALL' || q.L.some((x) => x.l.s === c) || q.u === c) && (!YV.ty || q.ty === YV.ty)).sort((a, b) => b.n - a.n || b.ymax - a.ymax);
       v.innerHTML = `<div class="hero fade" ${c === 'ALL' ? '' : col(c)}><div class="k">${name}</div><h1>${c === 'ALL' ? 'All subjects' : esc(SM[c].n)}</h1><div class="meta"><span>${qs.length} PYQs</span><span>most repeated first</span></div></div>
+        ${yvBar('rp', c)}
         <div class="ctrl" style="margin:.8rem 0">${seg([['', 'All'], ['L', 'Essay'], ['S', 'Short note']], YV.ty, 'yv-ty', 'style="flex:1"')}</div>
         <div class="stack">${qs.slice(0, YV.lim.rp).map((q, i) => `<div><div class="qref" style="display:inline-block;margin:0 0 .25rem .2rem">#${i + 1} · asked ${q.n}× · ${q.ty === 'L' ? 'Essay' : 'Short note'} · ${[...new Set(q.occ.map((o) => o.yn).filter(Boolean))].sort((x, y) => y - x).join(', ') || 'undated'}</div>${qCard(q)}</div>`).join('')}</div>
         ${qs.length > YV.lim.rp ? `<button class="btn ghost more-btn" data-act="yv-more" data-v="rp">Show more (${qs.length - YV.lim.rp} left)</button>` : ''}`;
@@ -591,6 +643,9 @@
       copyText(q.t + '\n— ' + q.occ.map((o) => o.y + ' ' + o.p + ' ' + o.ref).join('; ') + (q.L.length ? '\nLecture: ' + q.L.map((x) => SM[x.l.s].s + ' L' + x.l.n + ' ' + x.l.t).join(' | ') : ''));
     },
     'copy-l'(a) { const l = PF.lecById[a.dataset.id]; copyText(SM[l.s].n + ' · Lecture ' + l.n + ' · ' + l.t + ' (' + fmt(l.m) + ')'); },
+    'yv-kind'(a) { const m = /^#\/(?:hy|rp)\/(\w+)/.exec(location.hash); fwd = true; location.hash = '#/' + a.dataset.v + '/' + (m ? m[1] : 'ALL'); },
+    'hv-f'(a) { HV.f = a.dataset.v; rerender(); },
+    'hv-clear'() { if (confirm('Clear your history?')) { st.hist = []; PF.save(); rerender(); } },
     'yv-ty'(a) { YV.ty = a.dataset.v; rerender(); },
     'yv-rank'(a) { YV.rank = a.dataset.v; rerender(); },
     'yv-more'(a) { YV.lim[a.dataset.v] += a.dataset.v === 'hy' ? 30 : 20; rerender(); },
@@ -611,6 +666,8 @@
     's-restore-go'() { try { PF.importState($('#rt').value.trim()); applyTheme(); toast('Progress restored'); closeSheet(); rerender(); } catch (e) { toast('Invalid backup text'); } },
     's-reset'() { if (confirm('Erase all watched marks, saved items and notes on this device?')) { PF.resetState(); applyTheme(); closeSheet(); toast('Progress reset'); rerender(); } },
     'p-subj'(a) { const P = st.plan, c = a.dataset.v; P.subj = P.subj.includes(c) ? P.subj.filter((x) => x !== c) : [...P.subj, c]; PF.save(); rerender(); },
+    'st-tab'(a) { ST.tab = a.dataset.v; rerender(); window.scrollTo(0, 0); },
+    'q-subj'(a) { st.filters.subj = a.dataset.v === 'ALL' ? [] : [a.dataset.v]; PF.save(); updateHome(); },
     'p-mode'(a) { st.plan.mode = a.dataset.v; PF.save(); rerender(); },
     'p-shuffle'() { st.plan.seed++; PF.save(); rerender(); toast('Queue reshuffled'); },
     'p-order'(a) { st.plan.order = a.dataset.v; PF.save(); rerender(); },
@@ -688,9 +745,16 @@
     else if (r === 'quiz') viewQuiz(v, params);
     else if (r === 'saved') viewSaved(v);
     else if (r === 'trends') viewTrends(v, params);
+    else if (r === 'history') viewHistory(v);
     else if (r === 'hy' || r === 'rp') { if (parts[1]) viewYield(v, r, parts[1]); else viewPicker(v, r); }
     else if (r === 'yield') viewYield(v, 'hy', parts[1] || 'ALL');
     else viewHome(v);
+    if (!keepScroll) {
+      if (r === 'lecture' && PF.lecById[parts[1]]) PF.pushHist('lec', parts[1]);
+      else if (r === 'paper' && PF.paperById[parts[1]]) PF.pushHist('paper', parts[1]);
+      else if (r === 'subject' && SM[parts[1]] && parts[1] !== 'PHA') PF.pushHist('subject', parts[1]);
+      else if ((r === 'hy' || r === 'rp') && parts[1]) PF.pushHist(r, parts[1]);
+    }
     const key = location.hash || '#/';
     if (keepScroll) window.scrollTo(0, y); else if (!fwd && scrolls[key] !== undefined) window.scrollTo(0, scrolls[key]); else if (r !== 'paper' || !params.hl) window.scrollTo(0, 0);
     fwd = false; curHash = key;

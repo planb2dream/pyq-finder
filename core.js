@@ -15,7 +15,7 @@
   PF.yearNum = yearNum;
 
   /* ---------- subjects ---------- */
-  PF.VERSION = 'v8';
+  PF.VERSION = 'v9';
   PF.SM = {
     MED: { n: 'General Medicine', s: 'Medicine', c: '#ef4444', al: 'medicine internal medicine gen med physician' },
     SUR: { n: 'General Surgery', s: 'Surgery', c: '#0ea5e9', al: 'surgery' },
@@ -79,7 +79,7 @@
   /* ---------- persistent state ---------- */
   const KEY = 'pyqfinder.v1';
   const def = () => ({
-    rev: {}, exam: '', pins: [],
+    rev: {}, exam: '', pins: [], hist: [],
     watched: {}, starL: {}, starQ: {}, doneQ: {}, noteL: {}, noteQ: {},
     recent: [], recentS: [],
     settings: { theme: 'system', size: 'm' },
@@ -114,6 +114,7 @@
     Object.values(st.rev).forEach((r) => { if (r.mastered) mastered++; else if (r.due) { learning++; if (r.due <= end) due++; else if (r.due <= end + 7 * 864e5) week++; } });
     return { due, week, mastered, learning };
   };
+  PF.pushHist = (k, id) => { st.hist = [{ k, id, ts: Date.now() }, ...st.hist.filter((h) => !(h.k === k && h.id === id))].slice(0, 80); PF.save(); };
   PF.save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* ignore */ } };
   PF.resetState = () => { const d = def(); Object.keys(d).forEach((k) => (st[k] = d[k])); PF.save(); };
   PF.exportState = () => JSON.stringify({ app: 'pyqfinder', v: 1, data: st });
