@@ -1,0 +1,55 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Assemble web app folder
+        run: |
+          mkdir -p www
+          cp index.html app.css core.js app.js data.js papers_text.js manifest.webmanifest icon.svg www/
+
+      - name: Generate app icons
+        run: |
+          python3 -m pip install pillow
+          python3 make_icons.py
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Apply app icons
+        run: cp -r android-res/* android/app/src/main/res/
+
+      - name: Sync web assets
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PYQ-Finder-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk

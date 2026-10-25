@@ -1,0 +1,12 @@
+PYQ Finder v6 - upload steps (works from phone or PC, no folders needed)
+
+1. Create a new GitHub repository (Add a README is NOT needed).
+2. Upload ALL the files in this folder EXCEPT build-apk.yml:
+   Add file > Upload files > select every file > Commit changes.
+3. Create the build file by hand (this one needs a folder path):
+   Add file > Create new file
+   In the name box type exactly:   .github/workflows/build-apk.yml
+   (typing the slashes creates the folders automatically)
+   Open build-apk.yml from this folder, copy ALL its text, paste it, then Commit.
+4. Open the Actions tab > "Build Android APK" (it starts by itself; or press Run workflow).
+5. When it is green (about 5-8 min): open the run > Artifacts > PYQ-Finder-apk > download > unzip > install app-debug.apk
